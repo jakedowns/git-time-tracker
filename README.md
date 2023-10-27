@@ -38,16 +38,14 @@ Here's a breakdown of the available flags:
 - `-f` or `--filter`: Filter commits by a fuzzy match string such as an author's name or email.
 - `-s` or `--start`: Specify the start date for commits to consider (format: YY-MM-DD).
 - `-e` or `--end`: Specify the end date for commits to consider (format: YY-MM-DD).
+- `--repo`: Specify the remote repo path if it's not the cwd
 
-The script will produce three CSV files:
+The script will produce four CSV files:
 
 1. `output_detailed.csv`: Time worked for each day.
 2. `output_weekly_summary.csv`: Total time worked per week.
 3. `output_daily_summary.csv`: Time worked categorized by day.
-
-### 3. Customization
-
-The script assumes a simplistic format "XX hours" in the commit messages to denote time worked. If your commit messages follow a different format, you will need to adjust the `parse_commit_message` function in the script.
+4. `output_total_summary.csv`: Total time worked
 
 ## Feedback and Contribution
 
