@@ -5,13 +5,12 @@ import argparse
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-def parse_commit_message(message):
-    # Extract time information
-    return time
+total_time_worked = 0
 
 def convert_time_to_minutes(time_str):
-    # Convert to minutes
-    return minutes
+    # Convert time string in format HH:MM to minutes
+    hours, minutes = map(int, time_str.split(':'))
+    return hours * 60 + minutes
 
 def generate_summary(time_data_by_date):
     # Initialize summaries
@@ -45,7 +44,7 @@ def estimate_time_worked(current_commit, previous_commit, max_timeout):
 def round_time_to_nearest(time_worked, min_unit_worked):
     return round(time_worked / min_unit_worked) * min_unit_worked
 
-def main():
+def main(args=None):
     parser = argparse.ArgumentParser(description="Generate time-worked estimates from Git commits.")
     parser.add_argument('-f', '--filter', help="Filter for commit lines (e.g., author's name/email).", default="")
     parser.add_argument('-s', '--start', help="Start date in format YY-MM-DD.", default=None)
@@ -54,12 +53,18 @@ def main():
     parser.add_argument('--min-unit-worked', help="Round time worked to the nearest specified minutes.", type=int, default=60)
     parser.add_argument('--repo-path', help="Path to the Git repository.", default="")
 
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     repo = git.Repo(args.repo_path)  # Assuming the script is run in the repo directory
-    commits = list(repo.iter_commits())
+    start_date = args.start if args.start else '1970-01-01'  # Default to a date far in the past if no start date is provided
+    end_date = args.end if args.end else datetime.now().strftime('%Y-%m-%d')  # Default to today's date if no end date is provided
+
+    commits = list(repo.iter_commits(since=start_date, until=end_date))
 
     time_data_by_date = defaultdict(list)
+    commit_count_by_date = defaultdict(int)
+
+    commit_count = len(commits);
 
     previous_commit = None
     for commit in reversed(commits):  # We need to process commits in chronological order
@@ -79,8 +84,17 @@ def main():
             time_estimate = estimate_time_worked(commit, previous_commit, args.max_timeout)
             time_estimate = round_time_to_nearest(time_estimate, args.min_unit_worked)
             time_data_by_date[date].append((commit.hexsha[:7], commit.message, time_estimate))
+            commit_count_by_date[date] += 1  # Increment the commit count for this date
         
         previous_commit = commit
+
+    filtered_commits = len(time_data_by_date)
+    print(f"Number of commits checked: {commit_count}")
+    print(f"Number of commits filtered: {filtered_commits}")
+
+    print("Number of commits per day:")
+    for date, count in commit_count_by_date.items():
+        print(f"{date}: {count} commits")
 
     print("Generating summaries...")
     weekly_summary, daily_summary = generate_summary(time_data_by_date)
