@@ -18,12 +18,22 @@ def generate_summary(time_data_by_date):
     weekly_summary = defaultdict(int)
     daily_summary = defaultdict(int)
 
-    for date, time in time_data_by_date.items():
+    for date, commit_data in time_data_by_date.items():
         week_num = date.isocalendar()[1]
-        weekly_summary[week_num] += time
-        daily_summary[date] += time
+        total_time = sum(time for _, _, time in commit_data)  # Sum up the time worked for each date
+        weekly_summary[week_num] += total_time
+        daily_summary[date] += total_time
 
     return weekly_summary, daily_summary
+
+def generate_total_summary(time_data_by_date):
+    total_summary = defaultdict(int)
+
+    for date, commit_data in time_data_by_date.items():
+        total_time = sum(time for _, _, time in commit_data)
+        total_summary[date] = total_time
+
+    return total_summary
 
 def estimate_time_worked(current_commit, previous_commit, max_timeout):
     time_difference = (current_commit.committed_date - previous_commit.committed_date) / 60  # in minutes
@@ -49,7 +59,7 @@ def main():
     repo = git.Repo(args.repo_path)  # Assuming the script is run in the repo directory
     commits = list(repo.iter_commits())
 
-    time_data_by_date = defaultdict(int)
+    time_data_by_date = defaultdict(list)
 
     previous_commit = None
     for commit in reversed(commits):  # We need to process commits in chronological order
@@ -68,7 +78,7 @@ def main():
         if previous_commit:
             time_estimate = estimate_time_worked(commit, previous_commit, args.max_timeout)
             time_estimate = round_time_to_nearest(time_estimate, args.min_unit_worked)
-            time_data_by_date[date] += time_estimate
+            time_data_by_date[date].append((commit.hexsha[:7], commit.message, time_estimate))
         
         previous_commit = commit
 
@@ -83,23 +93,44 @@ def main():
     
     with open("output/output_detailed.csv", "w") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["Date", "Time Worked (in minutes)"])
-        for date, time in time_data_by_date.items():
-            writer.writerow([date, time])
+        writer.writerow(["Date", "Commit Hash", "Commit Message", "Time Worked (in hours)"])
+        for date, commit_data in time_data_by_date.items():
+            for commit_hash, commit_message, time in commit_data:
+                writer.writerow([date, commit_hash, commit_message, time / 60])  # Convert to hours
 
     with open("output/output_weekly_summary.csv", "w") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["Week Number", "Time Worked (in minutes)"])
+        writer.writerow(["Week Number", "Time Worked (in hours)"])
         for week_num, time in weekly_summary.items():
-            writer.writerow([week_num, time])
+            writer.writerow([week_num, time / 60])  # Convert to hours
 
     with open("output/output_daily_summary.csv", "w") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["Date", "Time Worked (in minutes)"])
+        writer.writerow(["Date", "Time Worked (in hours)"])
         for date, time in daily_summary.items():
-            writer.writerow([date, time])
+            writer.writerow([date, time / 60])  # Convert to hours
+
+    print("Generating total summary...")
+    total_summary = generate_total_summary(time_data_by_date)
+
+    print("Writing to total summary CSV file...")
+    with open("output/output_total_summary.csv", "w") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Date", "Total Time Worked (in hours)"])
+        for date, total_time in total_summary.items():
+            writer.writerow([date, total_time / 60])  # Convert to hours
 
     print("Process complete. Check the generated CSV files.")
+
+    # print("Printing contents of all output files...")
+    # for filename in os.listdir(output_dir):
+    #     if filename.endswith(".csv"):
+    #         print(f"\nContents of {filename}:")
+    #         with open(os.path.join(output_dir, filename), "r") as f:
+    #             print(f.read())
+
+    total_time_worked = sum(total_summary.values())
+    print(f"\nTotal time worked: {total_time_worked // 60} hours and {total_time_worked % 60} minutes")
 
 if __name__ == "__main__":
     main()
